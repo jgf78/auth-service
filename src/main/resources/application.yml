@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: auth-service
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/platform}
+
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+  web:
+    error:
+      include-message: never
+      include-stacktrace: never
+
+server:
+  port: ${SERVER_PORT:8087}
+  shutdown: graceful
+  address: 0.0.0.0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+info:
+  app:
+    name: Auth Service
+    description: Reusable authentication platform API
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+server:
+  forward-headers-strategy: framework
