@@ -105,23 +105,43 @@ public class SecurityConfig {
     @Bean
     Converter<Jwt, ? extends AbstractAuthenticationToken> jwtAuthenticationConverter() {
         return jwt -> {
+            Collection<GrantedAuthority> authorities = new ArrayList<>();
+
+            // Roles generales del realm
             Map<String, Object> realmAccess = jwt.getClaim("realm_access");
 
-            Object rolesClaim = realmAccess == null
+            Object realmRolesClaim = realmAccess == null
                     ? null
                     : realmAccess.get("roles");
 
-            List<String> roles = rolesClaim instanceof Collection<?> claimRoles
-                    ? claimRoles.stream()
-                            .filter(String.class::isInstance)
-                            .map(String.class::cast)
-                            .toList()
-                    : List.of();
+            if (realmRolesClaim instanceof Collection<?> realmRoles) {
+                realmRoles.stream()
+                        .filter(String.class::isInstance)
+                        .map(String.class::cast)
+                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                        .forEach(authorities::add);
+            }
 
-            Collection<GrantedAuthority> authorities = new ArrayList<>();
+            // Roles específicos de los clientes
+            Map<String, Object> resourceAccess = jwt.getClaim("resource_access");
 
-            for (String role : roles) {
-                authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+            if (resourceAccess != null) {
+                resourceAccess.forEach((clientId, clientAccess) -> {
+                    if (clientAccess instanceof Map<?, ?> clientAccessMap) {
+                        Object clientRolesClaim = clientAccessMap.get("roles");
+
+                        if (clientRolesClaim instanceof Collection<?> clientRoles) {
+                            clientRoles.stream()
+                                    .filter(String.class::isInstance)
+                                    .map(String.class::cast)
+                                    .map(role -> new SimpleGrantedAuthority(
+                                            "ROLE_" + clientId.toUpperCase()
+                                                    + "_" + role
+                                    ))
+                                    .forEach(authorities::add);
+                        }
+                    }
+                });
             }
 
             return new JwtAuthenticationToken(jwt, authorities);
